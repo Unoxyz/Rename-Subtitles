@@ -1,60 +1,72 @@
 =begin
-# 자막 파일명 일괄 변환 프로그램 #
-현재 폴더에서 영상과 파일명이 다른 자막 파일을 일괄적으로 변경한다.
+	드라마 자막 파일명 맞추기 v 1.1
+
+	인식 파일 패턴
+	"name.s01e02.2HD.ext"
+	"name.s1e2.2HD.ext"
+	"name.s01.e02.2HD.ext"
+	"name.s01_e02.2HD.ext"
+	"name.1x02.2HD.ext"
+	"name.102.2HD.ext"
 =end
 
-=begin _ToDo_
-Dir["*.smi", "*.srt"]
-FIle.close 필요.	
-=end
 
-# 현재 폴더의 모든 파일을 읽는다.
-folder = Dir.entries(".")
-ofiles = Array.new
-folder.each { |e| ofiles.push(File.basename(e, "r")) }
+movExt = [".mp4", ".mkv", ".avi", ".m4v", ".mov", ".wmv"]
+subExt = [".smi", ".srt", ".ass"]
 
-def parsingFile(file) # 정규표현식을 이용해 파일명을 분해한다.
-	movExt = [".mp4", ".mkv", ".avi", ".m4v", ".mov", ".wmv"]
-	subExt = [".smi", ".srt", ".ass"]
-	ext = /(\....)$/.match(file).to_s.downcase
-
-	tvShow = Array.new
-	tvShow[1] = file
-	tvShow[2] = /(.+)(?=\.S[0-9][0-9])/.match(file).to_s.tr_s(' ._-', ' ').capitalize	# Show name; 빈칸, ., _, - 등을 빈칸으로 변환
-	tvShow[3] = /[0-9][0-9](?=E)/.match(file).to_s						# Season number
-	tvShow[4] = /[0-9][0-9](?=\.)/.match(file).to_s					# Episode number
-
-	if movExt.find { |e| e == ext } # 파일의 종류를 판별한다.
-		tvShow[0] = "mov"
-	elsif subExt.find { |e| e == ext } 
-		tvShow[0] = "sub"
-	else
-		tvShow[0] = "none"
+# 확장자를 조건으로 받아서, 파일명+확장자로 분리
+def get_filename(*ext, type)
+	files = Array.new
+	pattern = ( ARGV[0] ? "#{ARGV[0]}/" : '' ) + "*{#{ext.join(",")}}"
+	Dir.glob(pattern) do |f|
+		filename = Hash.new
+		filename[:full] = f
+		filename[:base] = File.basename(f, ".*")
+		filename[:ext] = File.extname(f)
+		filename[:type] = type
+		files << filename
 	end
-	
-	tvShow
+	files
 end
 
-# 분해한 파일을 배열로 저장한다.
-pfiles = Array.new
-ofiles.each { |e| pfiles.push parsingFile(e) }
+# 드라마 파일명인지 판단하고, 드라마명, 시즌, 에피소드 추출
+def extract_tvshow(file)
+	regExs = [
+		Regexp.new('[Ss]([0-9]+)[ ._-]*[Ee]([0-9]+)([^\\/]*)$'),
+		Regexp.new('[\._ -]()[Ee][Pp]_?([0-9]+)([^\\/]*)$'),
+    Regexp.new('[\\/\._ \[\(-]([0-9]+)x([0-9]+)([^\\/]*)$'),
+    Regexp.new('[\\/\._ -]([0-9]+)([0-9][0-9])([\._ -][^\\/]*)$')
+  ]
+	matched = nil
 
-# 위 배열에서 자막 파일을 찾아 영상 파일과 매칭한 후, 자막 파일명을 변경한다.
-totalRen = 0
-pfiles.each do |i|	
-	if i.first == "sub" # 자막 파일이면 
-		matchMov = pfiles.find { |j| i[2..4] == j[2..4] && j[0] == "mov" } 
-		if matchMov # sub는 있는데 mov가 없으면 통과
-			matchMovExt = File.extname(matchMov[1])
-			matchMovName = matchMov[1].chomp(matchMovExt)
-			matchSubExt = File.extname(i[1])
-			matchSubName = i[1].chomp(matchSubExt)
-			if matchMovName != matchSubName # 자막과 영상 파일명이 같으면 통과
-				print i[1], " -> ", matchMovName, matchSubExt, "\n"
-				# File.rename(i[1], matchMovName + matchSubExt)
-				totalRen += 1
-			end
- 		end
+  regExs.each do |reg|
+		if file[:base] =~ reg
+			file[:show] = $`.tr_s(' ._-', ' ').strip.capitalize
+			file[:season] = $1
+			file[:episode] = $2
+			matched = reg
+		else
+		end
+  end
+
+	file[:type] = :none unless matched
+end
+
+movFiles = get_filename(movExt, :mov)
+movFiles.each { |e| extract_tvshow(e)}
+subFiles = get_filename(subExt, :sub)
+subFiles.each { |e| extract_tvshow(e)}
+
+# 파일명 비교 후 자막 파일 변경
+total_count = 0
+subFiles.each do |sub|
+	movFiles.each do |mov|
+		if mov[:base] != sub[:base] && mov[:type] == :mov && sub[:type] == :sub && mov[:show] == sub[:show] && mov[:season].to_i == sub[:season].to_i && mov[:episode].to_i == sub[:episode].to_i
+			# puts mov[:full] + " == " + sub[:full]
+			puts "#{sub[:full]} -> #{mov[:base]}#{sub[:ext]}"
+			File.rename(sub[:full], mov[:base] + sub[:ext]) # 실제 파일명 변경
+			total_count += 1
+		end
 	end
 end
-print totalRen, " file(s) renamed.\n"
+puts "#{total_count} file(s) renamed."

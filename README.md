@@ -5,15 +5,15 @@ Rename-Subtitles
 같은 폴더 내에 영상과 자막 파일명을 동일하게 맞춥니다.
 
 ## 인식 파일 패턴
-name.s01e02.2HD.ext
-name.s1e2.2HD.ext
-name.s01.e02.2HD.ext
-name.s01_e02.2HD.ext
-name.1x02.2HD.ext
-name.102.2HD.ext
+- name.s01e02.2HD.ext
+- name.s1e2.2HD.ext
+- name.s01.e02.2HD.ext
+- name.s01_e02.2HD.ext
+- name.1x02.2HD.ext
+- name.102.2HD.ext
 
 ## 사용법
-ruby RenameSubtitles.rb [폴더명(옵션)]
+> ruby RenameSubtitles.rb [폴더명(옵션)]
 
 ## TODO
 - 매칭되지 않은 드라마, 자막 파일 표시
